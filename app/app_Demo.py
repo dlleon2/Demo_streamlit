@@ -1,20 +1,65 @@
 import streamlit as st
 import pandas as pd
+import sqlite3
 import json
 import altair as alt
 
+# Nombre del archivo JSON
 json_file_path = "instituciones_0007.json"
+
+# Nombre de la base de datos SQLite
+db_name = "base_de_datos_app.db"
+
+# Crear la base de datos y la tabla si no existen
+def crear_base_de_datos():
+    db_conn = sqlite3.connect(db_name)
+    cursor = db_conn.cursor()
+
+    tabla_sql = """
+    CREATE TABLE IF NOT EXISTS instituciones (
+        AMIE TEXT PRIMARY KEY,
+        Nombre_Institucion TEXT,
+        Provincia TEXT,
+        Codigo_Provincia TEXT,
+        Codigo_Canton TEXT,
+        Canton TEXT,
+        Codigo_Parroquia TEXT,
+        Parroquia TEXT,
+        Zona_Administrativa TEXT
+    )
+    """
+    cursor.execute(tabla_sql)
+
+    db_conn.commit()
+    db_conn.close()
+
+# Función para cargar los datos del archivo JSON a la base de datos SQLite
+def cargar_datos_a_base_de_datos():
+    with open(json_file_path, "r") as f:
+        data = json.load(f)
+
+    df = pd.DataFrame.from_dict(data)
+
+    db_conn = sqlite3.connect(db_name)
+    df.to_sql("instituciones", db_conn, if_exists="replace", index=False)
+    db_conn.close()
+
+# Crear la base de datos y cargar los datos si aún no existen
+crear_base_de_datos()
+cargar_datos_a_base_de_datos()
+
+# Obtener la conexión a la base de datos SQLite
+db_conn = sqlite3.connect(db_name)
 
 st.set_page_config(layout="wide")
 
 st.title("Visualizador de Características")
 
-with open(json_file_path, "r") as f:
-    data = json.load(f)
+# Realizar la consulta a la base de datos y obtener los datos como DataFrame
+query = "SELECT * FROM instituciones"
+df = pd.read_sql(query, db_conn)
 
-df = pd.DataFrame.from_dict(data)
-
-st.write("Datos del archivo JSON:")
+st.write("Datos de la base de datos SQLite:")
 
 # Obtener la lista de instituciones
 instituciones = df["Nombre_Institucion"].unique()
@@ -97,3 +142,6 @@ elif chart_type_parroquias == "Pastel":
 
 st.write("Gráfico de barras o pastel por parroquia:")
 st.altair_chart(chart_parroquias, use_container_width=True)
+
+# Cierra la conexión a la base de datos al finalizar
+db_conn.close()
